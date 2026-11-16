@@ -1,0 +1,39 @@
+[
+  {
+    "theme": "자연과 휴식",
+    "rows": 5,
+    "cols": 5,
+    "difficulty": 40,
+    "words": [
+      { "word": "STAR", "r": 0, "c": 0, "dir": "H" },
+      { "word": "TREE", "r": 0, "c": 1, "dir": "V" },
+      { "word": "EAR", "r": 2, "c": 1, "dir": "H" },
+      { "word": "RAT", "r": 1, "c": 3, "dir": "V" }
+    ],
+    "bonusWords": ["ART", "EAT", "RATE", "SEA", "SET", "TEA", "TEAR"]
+  },
+  {
+    "theme": "카페 메뉴",
+    "rows": 5,
+    "cols": 5,
+    "difficulty": 44,
+    "words": [
+      { "word": "아이스", "r": 0, "c": 0, "dir": "H" },
+      { "word": "스무디", "r": 0, "c": 2, "dir": "V" },
+      { "word": "아이", "r": 2, "c": 0, "dir": "H" }
+    ],
+    "bonusWords": ["라디오", "마디", "무스"]
+  },
+  {
+    "theme": "우주 탐험",
+    "rows": 5,
+    "cols": 5,
+    "difficulty": 48,
+    "words": [
+      { "word": "MOON", "r": 0, "c": 0, "dir": "H" },
+      { "word": "MARS", "r": 0, "c": 0, "dir": "V" },
+      { "word": "RING", "r": 3, "c": 0, "dir": "H" }
+    ],
+    "bonusWords": ["ARM", "RAM", "SON", "SUN"]
+  }
+]
