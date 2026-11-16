@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Word Tiles - Relaxing Puzzle</title>
+  <style>
+    :root {
+      --bg: #f5f1e8;
+      --panel: #ffffff;
+      --board: #e5dfd2;
+      --cell: #ffffff;
+      --filled: #4a7c59;
+      --text: #293241;
+      --accent: #f39c12;
+      --muted: #7f8c8d;
+      --gold: #f1c40f;
+      --danger: #d9534f;
+    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      margin: 0;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+    .app {
+      width: min(100%, 480px);
+      min-height: 100vh;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px 24px;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .topbar, .subbar, .panel { background: var(--panel); border-radius: 18px; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
+    }
+    .left, .right { display: flex; align-items: center; gap: 8px; }
+    .level { font-weight: 800; color: #3d5a80; }
+    .theme { background: #eef2f7; color: #556; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .coin { background: #fff8df; border: 2px solid #f5cd3b; color: #b27a00; border-radius: 999px; padding: 6px 12px; font-weight: 800; }
+    .icon-btn, .main-btn {
+      border: none; cursor: pointer; border-radius: 14px; font-weight: 700;
+      background: #f3ede3; color: var(--text); padding: 8px 10px;
+    }
+    .icon-btn:disabled, .main-btn:disabled { opacity: .45; cursor: default; }
+    .subbar {
+      display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
+      font-size: 13px; gap: 8px;
+    }
+    .panel { padding: 14px; }
+    .board-wrap { display: flex; justify-content: center; }
+    .board {
+      display: grid; gap: 6px; background: var(--board); border-radius: 18px; padding: 12px; position: relative;
+    }
+    .cell {
+      width: 46px; height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; background: transparent; transform: translateZ(0);
+    }
+    .cell.playable { background: var(--cell); box-shadow: 0 2px 4px rgba(0,0,0,.06); color: transparent; }
+    .cell.filled { background: var(--filled); color: #fff; box-shadow: 0 4px 8px rgba(74,124,89,.25); }
+    .cell.preview { outline: 2px solid #75c98a; }
+    .input-area { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .current-word {
+      min-height: 52px; width: 100%; display: flex; align-items: center; justify-content: center;
+      border-radius: 999px; background: #fff; border: 2px solid #ddd2c0; font-size: 26px; font-weight: 900;
+      letter-spacing: 4px;
+    }
+    .current-word.error { border-color: var(--danger); color: var(--danger); animation: shake .25s linear 1; }
+    .current-word.success { border-color: #4a7c59; color: #4a7c59; }
+    .status { min-height: 18px; font-size: 13px; color: var(--muted); }
+    .rack-wrap { position: relative; }
+    svg.lines { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+    .rack { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    .tile {
+      position: relative; min-height: 58px; border-radius: 14px; background: #fffdf8; border: 2px solid #d9cfbd;
+      display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--text);
+      box-shadow: 0 6px 14px rgba(0,0,0,.05); transition: transform .12s ease, background .12s ease;
+      touch-action: none;
+    }
+    .tile.active { background: #fff1d8; border-color: var(--accent); transform: translateY(-2px) scale(1.03); }
+    .tile.disabled { opacity: .4; }
+    .badge {
+      position: absolute; top: 4px; right: 6px; min-width: 20px; padding: 2px 6px; text-align: center;
+      border-radius: 999px; background: #3d5a80; color: #fff; font-size: 12px; font-weight: 800;
+    }
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .main-btn { background: #f7efe3; padding: 12px 10px; }
+    .main-btn.primary { background: #f39c12; color: #fff; }
+    .word-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: #eef2f7; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+    .chip.done { background: #dff3e4; color: #256c41; }
+    .footer { text-align: center; color: var(--muted); font-size: 12px; }
+    .flying {
+      position: fixed; z-index: 9999; width: 44px; height: 44px; border-radius: 10px; pointer-events: none;
+      background: var(--accent); color: white; display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 900; box-shadow: 0 8px 18px rgba(243,156,18,.35);
+      transition: left .35s cubic-bezier(.22,1,.36,1), top .35s cubic-bezier(.22,1,.36,1), opacity .35s ease;
+    }
+    .flash { animation: pop .25s ease; }
+    .save-indicator { color: #4a7c59; font-weight: 800; font-size: 12px; opacity: .35; transition: opacity .3s ease; }
+    .save-indicator.active { opacity: 1; }
+    @keyframes shake { 25% { transform: translateX(-4px);} 50% {transform: translateX(4px);} 75% {transform: translateX(-4px);} }
+    @keyframes pop { 0%{transform:scale(.8)} 60%{transform:scale(1.12)} 100%{transform:scale(1)} }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="left">
+        <div class="level" id="levelLabel">LEVEL 1</div>
+        <div class="theme" id="themeLabel">자연과 휴식</div>
+      </div>
+      <div class="right">
+        <div class="coin" id="coinLabel">🪙 100</div>
+        <button class="icon-btn" id="soundBtn">🔊</button>
+      </div>
+    </div>
+
+    <div class="subbar">
+      <button class="icon-btn" id="bonusBtn">🎁 보너스 0</button>
+      <div class="save-indicator" id="saveIndicator">💾 저장됨</div>
+    </div>
+
+    <div class="panel board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="panel input-area">
+      <div class="current-word" id="currentWord"></div>
+      <div class="status" id="statusMsg">타일을 이어 단어를 만드세요.</div>
+    </div>
+
+    <div class="panel rack-wrap">
+      <svg class="lines" id="lineLayer"></svg>
+      <div class="rack" id="rack"></div>
+      <div class="actions">
+        <button class="main-btn" id="clearBtn">지우기</button>
+        <button class="main-btn" id="hintBtn">힌트 -30🪙</button>
+        <button class="main-btn primary" id="nextBtn" disabled>다음 레벨</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:800; margin-bottom:8px;">정답 단어</div>
+      <div class="word-list" id="targetWords"></div>
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:800; margin-bottom:8px;">찾은 보너스 단어</div>
+      <div class="word-list" id="bonusWordsFound"></div>
+    </div>
+
+    <div class="footer">교차 칸은 한 번만 차감되도록 셀 기준으로 수량을 다시 계산합니다.</div>
+  </div>
+
+  <script>
+    const SAVE_KEY = 'WORD_TILES_SAVE_V1';
+    const LEVELS = [
+      {
+        theme: '자연과 휴식', rows: 5, cols: 5,
+        words: [
+          { word: 'STAR', r: 0, c: 0, dir: 'H' },
+          { word: 'TREE', r: 0, c: 1, dir: 'V' },
+          { word: 'EAR', r: 2, c: 1, dir: 'H' },
+          { word: 'RAT', r: 1, c: 3, dir: 'V' },
+        ],
+        bonusWords: ['TEA','EAT','ART','SEA','SET','RATE','TEAR'],
+      },
+      {
+        theme: '카페 메뉴', rows: 5, cols: 5,
+        words: [
+          { word: '아이스', r: 0, c: 0, dir: 'H' },
+          { word: '스무디', r: 0, c: 2, dir: 'V' },
+          { word: '아이', r: 2, c: 0, dir: 'H' },
+        ],
+        bonusWords: ['마디','무스','라디오'],
+      },
+      {
+        theme: '우주 탐험', rows: 5, cols: 5,
+        words: [
+          { word: 'MOON', r: 0, c: 0, dir: 'H' },
+          { word: 'MARS', r: 0, c: 0, dir: 'V' },
+          { word: 'RING', r: 3, c: 0, dir: 'H' },
+        ],
+        bonusWords: ['ARM','RAM','SON','SUN'],
+      },
+    ];
+
+    const state = {
+      levelIdx: 0,
+      coins: 100,
+      soundEnabled: true,
+      filledCoords: new Set(),
+      foundBonusWords: new Set(),
+      selectedTiles: [],
+      dragActive: false,
+      dragLastTileId: null,
+      dragLeftRack: false,
+      audioCtx: null,
+      currentPreviewCoords: [],
+    };
+
+    const el = {
+      board: document.getElementById('board'),
+      rack: document.getElementById('rack'),
+      lineLayer: document.getElementById('lineLayer'),
+      currentWord: document.getElementById('currentWord'),
+      statusMsg: document.getElementById('statusMsg'),
+      levelLabel: document.getElementById('levelLabel'),
+      themeLabel: document.getElementById('themeLabel'),
+      coinLabel: document.getElementById('coinLabel'),
+      soundBtn: document.getElementById('soundBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      hintBtn: document.getElementById('hintBtn'),
+      nextBtn: document.getElementById('nextBtn'),
+      bonusBtn: document.getElementById('bonusBtn'),
+      targetWords: document.getElementById('targetWords'),
+      bonusWordsFound: document.getElementById('bonusWordsFound'),
+      saveIndicator: document.getElementById('saveIndicator'),
+    };
+
+    function getLevel() { return LEVELS[state.levelIdx]; }
+    function coordKey(r, c) { return `${r},${c}`; }
+    function parseKey(key) { return key.split(',').map(Number); }
+
+    function buildCellMap(level) {
+      const map = new Map();
+      level.words.forEach(item => {
+        [...item.word].forEach((char, index) => {
+          const r = item.r + (item.dir === 'V' ? index : 0);
+          const c = item.c + (item.dir === 'H' ? index : 0);
+          map.set(coordKey(r, c), char);
+        });
+      });
+      return map;
+    }
+
+    function recalcTileCounts() {
+      const counts = new Map();
+      const level = getLevel();
+      buildCellMap(level).forEach((char, key) => {
+        if (state.filledCoords.has(key)) return;
+        counts.set(char, (counts.get(char) || 0) + 1);
+      });
+      return counts;
+    }
+
+    function remainingCountForLetter(letter) {
+      const counts = recalcTileCounts();
+      return counts.get(letter) || 0;
+    }
+
+    function selectedCountForLetter(letter) {
+      return state.selectedTiles.filter(tile => tile.letter === letter).length;
+    }
+
+    function getCurrentWord() {
+      return state.selectedTiles.map(tile => tile.letter).join('');
+    }
+
+    function renderHeader() {
+      const level = getLevel();
+      el.levelLabel.textContent = `LEVEL ${state.levelIdx + 1}`;
+      el.themeLabel.textContent = level.theme;
+      el.coinLabel.textContent = `🪙 ${state.coins}`;
+      el.soundBtn.textContent = state.soundEnabled ? '🔊' : '🔇';
+      el.bonusBtn.textContent = `🎁 보너스 ${state.foundBonusWords.size}`;
+    }
+
+    function renderBoard() {
+      const level = getLevel();
+      const cellMap = buildCellMap(level);
+      el.board.style.gridTemplateColumns = `repeat(${level.cols}, 46px)`;
+      el.board.innerHTML = '';
+      for (let r = 0; r < level.rows; r += 1) {
+        for (let c = 0; c < level.cols; c += 1) {
+          const key = coordKey(r, c);
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.key = key;
+          if (cellMap.has(key)) {
+            cell.classList.add('playable');
+            if (state.filledCoords.has(key)) {
+              cell.classList.add('filled');
+              cell.textContent = cellMap.get(key);
+            }
+          }
+          el.board.appendChild(cell);
+        }
+      }
+      updatePreview();
+    }
+
+    function renderTargetWords() {
+      const level = getLevel();
+      el.targetWords.innerHTML = '';
+      level.words.forEach(item => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        const solved = wordIsSolved(item);
+        if (solved) chip.classList.add('done');
+        chip.textContent = item.word;
+        el.targetWords.appendChild(chip);
+      });
+      el.nextBtn.disabled = !allSolved();
+    }
+
+    function renderBonusWords() {
+      el.bonusWordsFound.innerHTML = '';
+      [...state.foundBonusWords].sort().forEach(word => {
+        const chip = document.createElement('div');
+        chip.className = 'chip done';
+        chip.textContent = `${word} +15🪙`;
+        el.bonusWordsFound.appendChild(chip);
+      });
+    }
+
+    function refreshRackVisuals() {
+      const counts = recalcTileCounts();
+      el.rack.querySelectorAll('.tile').forEach(tile => {
+        const letter = tile.dataset.letter;
+        const remaining = counts.get(letter) || 0;
+        const selected = selectedCountForLetter(letter);
+        const available = Math.max(0, remaining - selected);
+        tile.classList.toggle('disabled', available <= 0);
+        tile.classList.toggle('active', state.selectedTiles.some(entry => entry.id === tile.dataset.id));
+        tile.querySelector('.badge').textContent = String(available);
+      });
+      drawSelectionLines();
+    }
+
+    function renderRack() {
+      const letters = [...new Set([...buildCellMap(getLevel()).values()])].sort((a, b) => a.localeCompare(b, 'ko'));
+      el.rack.innerHTML = '';
+      letters.forEach(letter => {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.dataset.letter = letter;
+        tile.dataset.id = `${letter}-${Math.random().toString(36).slice(2, 8)}`;
+        tile.innerHTML = `<span>${letter}</span><span class="badge">0</span>`;
+        tile.addEventListener('pointerdown', event => beginDrag(event, tile));
+        tile.addEventListener('pointerenter', () => handleTileHover(tile));
+        tile.addEventListener('click', () => addTileSelection(tile));
+        el.rack.appendChild(tile);
+      });
+      refreshRackVisuals();
+    }
+
+    function updateCurrentWord(statusClass = '') {
+      el.currentWord.className = `current-word${statusClass ? ` ${statusClass}` : ''}`;
+      el.currentWord.textContent = getCurrentWord() || '·';
+    }
+
+    function setStatus(message) { el.statusMsg.textContent = message; }
+
+    function saveState() {
+      const payload = {
+        levelIdx: state.levelIdx,
+        coins: state.coins,
+        soundEnabled: state.soundEnabled,
+        filledCoords: [...state.filledCoords].map(parseKey),
+        foundBonusWords: [...state.foundBonusWords],
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      el.saveIndicator.classList.add('active');
+      clearTimeout(saveState._timer);
+      saveState._timer = setTimeout(() => el.saveIndicator.classList.remove('active'), 900);
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return;
+        const payload = JSON.parse(raw);
+        state.levelIdx = Math.min(payload.levelIdx || 0, LEVELS.length - 1);
+        state.coins = payload.coins ?? 100;
+        state.soundEnabled = payload.soundEnabled ?? true;
+        state.filledCoords = new Set((payload.filledCoords || []).map(([r, c]) => coordKey(r, c)));
+        state.foundBonusWords = new Set(payload.foundBonusWords || []);
+      } catch (error) {
+        console.warn('save load failed', error);
+      }
+    }
+
+    function resetLevelState(keepCoins = true) {
+      state.filledCoords = new Set();
+      state.foundBonusWords = new Set();
+      state.selectedTiles = [];
+      if (!keepCoins) state.coins = 100;
+      saveState();
+    }
+
+    function wordCoords(item) {
+      return [...item.word].map((_, index) => [item.r + (item.dir === 'V' ? index : 0), item.c + (item.dir === 'H' ? index : 0)]);
+    }
+
+    function wordIsSolved(item) {
+      return wordCoords(item).every(([r, c]) => state.filledCoords.has(coordKey(r, c)));
+    }
+
+    function allSolved() {
+      return getLevel().words.every(wordIsSolved);
+    }
+
+    function matchingBoardWord(word) {
+      return getLevel().words.find(item => item.word === word && !wordIsSolved(item));
+    }
+
+    function addTileSelection(tile) {
+      const letter = tile.dataset.letter;
+      if (!letter) return;
+      const remaining = remainingCountForLetter(letter);
+      const selected = selectedCountForLetter(letter);
+      if (selected >= remaining) return;
+      tile.classList.add('active');
+      state.selectedTiles.push({ letter, id: tile.dataset.id, tile });
+      state.dragLastTileId = tile.dataset.id;
+      state.dragLeftRack = false;
+      playTone(440 + state.selectedTiles.length * 30, 0.03, 'triangle');
+      updateCurrentWord();
+      updatePreview();
+      refreshRackVisuals();
+    }
+
+    function beginDrag(event, tile) {
+      event.preventDefault();
+      state.dragActive = true;
+      addTileSelection(tile);
+      tile.setPointerCapture?.(event.pointerId);
+    }
+
+    function handleTileHover(tile) {
+      if (!state.dragActive) return;
+      const id = tile.dataset.id;
+      const lastId = state.dragLastTileId;
+      if (!lastId || id !== lastId) {
+        addTileSelection(tile);
+        return;
+      }
+      if (state.dragLeftRack) addTileSelection(tile);
+    }
+
+    function onPointerMove(event) {
+      if (!state.dragActive) return;
+      const hit = document.elementFromPoint(event.clientX, event.clientY);
+      const tile = hit?.closest?.('.tile');
+      if (!tile) {
+        state.dragLeftRack = true;
+        return;
+      }
+      handleTileHover(tile);
+      drawSelectionLines(event.clientX, event.clientY);
+    }
+
+    function onPointerUp() {
+      if (!state.dragActive) return;
+      state.dragActive = false;
+      submitCurrentWord();
+      drawSelectionLines();
+    }
+
+    function clearSelection() {
+      state.selectedTiles = [];
+      state.dragLastTileId = null;
+      state.dragLeftRack = false;
+      updateCurrentWord();
+      updatePreview();
+      refreshRackVisuals();
+    }
+
+    function updatePreview() {
+      el.board.querySelectorAll('.cell.preview').forEach(cell => cell.classList.remove('preview'));
+      const currentWord = getCurrentWord();
+      state.currentPreviewCoords = [];
+      if (!currentWord) return;
+      const item = matchingBoardWord(currentWord);
+      if (!item) return;
+      const coords = wordCoords(item).filter(([r, c]) => !state.filledCoords.has(coordKey(r, c)));
+      state.currentPreviewCoords = coords;
+      coords.forEach(([r, c]) => {
+        const cell = el.board.querySelector(`.cell[data-key="${coordKey(r, c)}"]`);
+        cell?.classList.add('preview');
+      });
+    }
+
+    function playTone(freq, duration = 0.06, type = 'sine', gainValue = 0.05) {
+      if (!state.soundEnabled) return;
+      if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = state.audioCtx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.value = gainValue;
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    }
+
+    function playSuccess() { [523, 659, 784].forEach((freq, i) => setTimeout(() => playTone(freq, 0.08, 'triangle', 0.04), i * 55)); }
+    function playError() { playTone(220, 0.14, 'sawtooth', 0.03); }
+    function playCoin() { [880, 1175].forEach((freq, i) => setTimeout(() => playTone(freq, 0.06, 'square', 0.03), i * 50)); }
+
+    function animateWordFill(item) {
+      const coords = wordCoords(item).filter(([r, c]) => !state.filledCoords.has(coordKey(r, c)));
+      const letters = [...item.word];
+      coords.forEach(([r, c], index) => {
+        const cell = el.board.querySelector(`.cell[data-key="${coordKey(r, c)}"]`);
+        const source = state.selectedTiles[index]?.tile || state.selectedTiles[0]?.tile || el.rack.querySelector(`.tile[data-letter="${letters[index] || letters[0]}"]`);
+        if (!cell || !source) return;
+        const sourceRect = source.getBoundingClientRect();
+        const targetRect = cell.getBoundingClientRect();
+        const fly = document.createElement('div');
+        fly.className = 'flying';
+        fly.textContent = letters[index] || letters[0];
+        fly.style.left = `${sourceRect.left + sourceRect.width / 2 - 22}px`;
+        fly.style.top = `${sourceRect.top + sourceRect.height / 2 - 22}px`;
+        document.body.appendChild(fly);
+        requestAnimationFrame(() => {
+          fly.style.left = `${targetRect.left + targetRect.width / 2 - 22}px`;
+          fly.style.top = `${targetRect.top + targetRect.height / 2 - 22}px`;
+          fly.style.opacity = '.2';
+        });
+        setTimeout(() => {
+          fly.remove();
+          cell.classList.add('flash');
+          setTimeout(() => cell.classList.remove('flash'), 250);
+        }, 360 + index * 40);
+      });
+    }
+
+    function markWordSolved(item) {
+      animateWordFill(item);
+      wordCoords(item).forEach(([r, c]) => state.filledCoords.add(coordKey(r, c)));
+      state.coins += Math.max(10, item.word.length * 5);
+      playSuccess();
+      setStatus(`정답! ${item.word}`);
+      saveState();
+      renderAll();
+      if (allSolved()) {
+        state.coins += 30;
+        setStatus('스테이지 클리어! +30🪙');
+        saveState();
+        renderHeader();
+        el.nextBtn.disabled = state.levelIdx >= LEVELS.length - 1;
+      }
+    }
+
+    function awardBonus(word) {
+      state.foundBonusWords.add(word);
+      state.coins += 15;
+      playCoin();
+      setStatus(`보너스 단어 ${word}! +15🪙`);
+      saveState();
+      renderAll();
+    }
+
+    function submitCurrentWord() {
+      const word = getCurrentWord();
+      if (word.length < 2) {
+        clearSelection();
+        return;
+      }
+      const boardWord = matchingBoardWord(word);
+      const isBonus = getLevel().bonusWords.includes(word) && !state.foundBonusWords.has(word);
+      if (boardWord) {
+        updateCurrentWord('success');
+        markWordSolved(boardWord);
+      } else if (isBonus) {
+        updateCurrentWord('success');
+        awardBonus(word);
+      } else {
+        updateCurrentWord('error');
+        playError();
+        setStatus('아직 보드 정답이나 보너스 단어가 아닙니다.');
+      }
+      setTimeout(() => clearSelection(), 220);
+    }
+
+    function giveHint() {
+      if (state.coins < 30) {
+        setStatus('코인이 부족합니다.');
+        playError();
+        return;
+      }
+      const allCoords = [...buildCellMap(getLevel()).keys()].filter(key => !state.filledCoords.has(key));
+      if (!allCoords.length) return;
+      const randomKey = allCoords[Math.floor(Math.random() * allCoords.length)];
+      state.coins -= 30;
+      state.filledCoords.add(randomKey);
+      setStatus('힌트로 한 칸을 열었습니다.');
+      playSuccess();
+      saveState();
+      renderAll();
+    }
+
+    function drawSelectionLines(pointerX = null, pointerY = null) {
+      const rackRect = el.rack.getBoundingClientRect();
+      el.lineLayer.setAttribute('viewBox', `0 0 ${rackRect.width} ${rackRect.height}`);
+      el.lineLayer.innerHTML = '';
+      if (!state.selectedTiles.length) return;
+      const points = state.selectedTiles.map(entry => {
+        const rect = entry.tile.getBoundingClientRect();
+        return [rect.left + rect.width / 2 - rackRect.left, rect.top + rect.height / 2 - rackRect.top];
+      });
+      if (pointerX !== null && pointerY !== null) points.push([pointerX - rackRect.left, pointerY - rackRect.top]);
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const [x1, y1] = points[i];
+        const [x2, y2] = points[i + 1];
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#f39c12');
+        line.setAttribute('stroke-width', '6');
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('opacity', '.7');
+        el.lineLayer.appendChild(line);
+      }
+    }
+
+    function renderAll() {
+      renderHeader();
+      renderBoard();
+      renderTargetWords();
+      renderBonusWords();
+      renderRack();
+      updateCurrentWord();
+    }
+
+    function nextLevel() {
+      if (state.levelIdx >= LEVELS.length - 1) return;
+      state.levelIdx += 1;
+      state.filledCoords = new Set();
+      state.foundBonusWords = new Set();
+      state.selectedTiles = [];
+      setStatus('다음 레벨로 이동했습니다.');
+      saveState();
+      renderAll();
+    }
+
+    function attachEvents() {
+      el.clearBtn.addEventListener('click', () => { clearSelection(); setStatus('입력을 지웠습니다.'); });
+      el.hintBtn.addEventListener('click', giveHint);
+      el.nextBtn.addEventListener('click', nextLevel);
+      el.soundBtn.addEventListener('click', () => { state.soundEnabled = !state.soundEnabled; saveState(); renderHeader(); });
+      el.bonusBtn.addEventListener('click', () => {
+        const list = getLevel().bonusWords.join(', ');
+        alert(`이번 레벨 보너스 단어 후보\n\n${list || '없음'}`);
+      });
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('resize', renderAll);
+    }
+
+    function boot() {
+      loadState();
+      attachEvents();
+      renderAll();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
+
+
