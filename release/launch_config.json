@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "approved_design_not_runtime_config",
+  "platform": "ios_first",
+  "locales": ["ko", "en", "ja"],
+  "fallback_locale": "en",
+  "additional_locales_planned": 15,
+  "content": {
+    "main_levels_per_locale": 450,
+    "daily_levels_per_locale": 30,
+    "levels_per_chapter": 15,
+    "target_days": 30,
+    "target_main_levels_per_day": 15,
+    "target_session_minutes": [15, 25],
+    "max_rows": 7,
+    "max_cols": 7,
+    "max_distinct_tiles": 10,
+    "theme_ids": ["garden", "forest", "sea", "cafe", "sunset", "greenhouse"]
+  },
+  "economy_proposal": {
+    "initial_coins": 120,
+    "word_reward": 0,
+    "main_clear_reward": 10,
+    "bonus_reward": 2,
+    "rewarded_bonuses_per_level": 5,
+    "hint_cost": 60,
+    "daily_puzzle_reward": 30,
+    "daily_goal_main_clears": 5,
+    "daily_goal_reward": 20,
+    "rewarded_ad_coins": 60,
+    "coin_pack_amounts": [600, 1800]
+  },
+  "ads_proposal": {
+    "initial_main_clears_grace": 15,
+    "initial_play_seconds_grace": 900,
+    "interstitial_interval_seconds": 180,
+    "interstitial_main_clears_interval": 4,
+    "interstitial_session_cap": 3,
+    "interstitial_local_day_cap": 8,
+    "rewarded_local_day_cap": 6,
+    "interstitial_cooldown_after_rewarded_seconds": 180,
+    "remove_ads_removes": ["interstitial"],
+    "remove_ads_keeps_opt_in_rewarded": true
+  }
+}

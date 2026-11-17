@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "status": "art_direction_approved_production_pending",
+  "groups": [
+    {"id":"app_icon","count":1,"names":["app_icon"],"directory":"art/source/app","format":"PNG","size":[1024,1024],"transparent":false},
+    {"id":"wordmark","count":1,"names":["wordmark"],"directory":"art/source/app","format":"PNG","size":[1600,400],"transparent":true},
+    {"id":"backgrounds","count":6,"names":["garden","forest","sea","cafe","sunset","greenhouse"],"directory":"art/source/backgrounds","format":"PNG","size":[1440,2560],"transparent":false},
+    {"id":"tiles","count":5,"names":["normal","selected","filled","reusable","disabled"],"directory":"art/source/tiles","format":"PNG","size":[256,256],"transparent":true},
+    {"id":"icons","count":16,"names":["home","settings","back","sound","music","haptics","language","hint","clear","submit","next","coin","shop","daily","gift","watch_ad"],"directory":"art/source/icons","format":"PNG_or_SVG","size":[128,128],"transparent":true},
+    {"id":"buttons","count":4,"names":["normal","accent","pressed","disabled"],"directory":"art/source/buttons","format":"PNG","size":[384,128],"transparent":true,"nine_slice":true},
+    {"id":"stamps","count":6,"names":["garden","forest","sea","cafe","sunset","greenhouse"],"directory":"art/source/stamps","format":"PNG","size":[256,256],"transparent":true},
+    {"id":"effects","count":2,"names":["sparkle","leaf_confetti"],"directory":"art/source/effects","format":"runtime_or_PNG","size":[256,256],"transparent":true},
+    {"id":"bgm","count":1,"names":["garden_loop"],"directory":"godot-project/audio","format":"WAV","minimum_loop_seconds":48},
+    {"id":"sfx","count":10,"names":["select","success","bonus","hint","error","clear","button","coin","reward","notice"],"directory":"godot-project/scripts","format":"runtime_PCM","generator":"GameAudio.gd"},
+    {"id":"store_screenshots","count":15,"locales":["ko","en","ja"],"per_locale":5,"directory":"art/store","format":"PNG","size":"verify_with_App_Store_Connect"}
+  ]
+}

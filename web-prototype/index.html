@@ -77,16 +77,19 @@
     .current-word.success { border-color: #4a7c59; color: #4a7c59; }
     .status { min-height: 18px; font-size: 13px; color: var(--muted); }
     .rack-wrap { position: relative; }
-    svg.lines { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
-    .rack { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    .rack-stage { position: relative; max-width: 100%; margin: 0 auto; }
+    svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .rack { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
     .tile {
-      position: relative; min-height: 58px; border-radius: 14px; background: #fffdf8; border: 2px solid #d9cfbd;
+      position: relative; min-width: 0; min-height: 44px; aspect-ratio: 1; border-radius: 14px; background: #fffdf8; border: 2px solid #d9cfbd;
       display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--text);
       box-shadow: 0 6px 14px rgba(0,0,0,.05); transition: transform .12s ease, background .12s ease;
       touch-action: none;
     }
     .tile.active { background: #fff1d8; border-color: var(--accent); transform: translateY(-2px) scale(1.03); }
     .tile.disabled { opacity: .4; }
+    .tile.reusable { border-color: var(--filled); }
+    .tile.reusable::after { content: '↻'; position: absolute; left: 5px; top: 3px; font-size: 14px; color: var(--filled); }
     .badge {
       position: absolute; top: 4px; right: 6px; min-width: 20px; padding: 2px 6px; text-align: center;
       border-radius: 999px; background: #3d5a80; color: #fff; font-size: 12px; font-weight: 800;
@@ -134,13 +137,15 @@
     </div>
 
     <div class="panel input-area">
-      <div class="current-word" id="currentWord"></div>
+      <div class="current-word" id="currentWord" role="button" tabindex="0" aria-label="입력한 단어 제출"></div>
       <div class="status" id="statusMsg">타일을 이어 단어를 만드세요.</div>
     </div>
 
     <div class="panel rack-wrap">
-      <svg class="lines" id="lineLayer"></svg>
-      <div class="rack" id="rack"></div>
+      <div class="rack-stage" id="rackStage">
+        <svg class="lines" id="lineLayer"></svg>
+        <div class="rack" id="rack"></div>
+      </div>
       <div class="actions">
         <button class="main-btn" id="clearBtn">지우기</button>
         <button class="main-btn" id="hintBtn">힌트 -30🪙</button>
@@ -158,7 +163,7 @@
       <div class="word-list" id="bonusWordsFound"></div>
     </div>
 
-    <div class="footer">교차 칸은 한 번만 차감되도록 셀 기준으로 수량을 다시 계산합니다.</div>
+    <div class="footer">스와이프하거나 글자를 누른 뒤 입력 단어를 눌러 제출하세요. ↻는 채워진 글자 재사용입니다.</div>
   </div>
 
   <script>
@@ -170,7 +175,7 @@
           { word: 'STAR', r: 0, c: 0, dir: 'H' },
           { word: 'TREE', r: 0, c: 1, dir: 'V' },
           { word: 'EAR', r: 2, c: 1, dir: 'H' },
-          { word: 'RAT', r: 1, c: 3, dir: 'V' },
+          { word: 'RAT', r: 2, c: 3, dir: 'V' },
         ],
         bonusWords: ['TEA','EAT','ART','SEA','SET','RATE','TEAR'],
       },
@@ -181,16 +186,16 @@
           { word: '스무디', r: 0, c: 2, dir: 'V' },
           { word: '아이', r: 2, c: 0, dir: 'H' },
         ],
-        bonusWords: ['마디','무스','라디오'],
+        bonusWords: ['무스'],
       },
       {
         theme: '우주 탐험', rows: 5, cols: 5,
         words: [
           { word: 'MOON', r: 0, c: 0, dir: 'H' },
           { word: 'MARS', r: 0, c: 0, dir: 'V' },
-          { word: 'RING', r: 3, c: 0, dir: 'H' },
+          { word: 'RING', r: 2, c: 0, dir: 'H' },
         ],
-        bonusWords: ['ARM','RAM','SON','SUN'],
+        bonusWords: ['ARM','RAM','SON'],
       },
     ];
 
@@ -200,8 +205,10 @@
       soundEnabled: true,
       filledCoords: new Set(),
       foundBonusWords: new Set(),
+      rewardClaimed: false,
       selectedTiles: [],
       dragActive: false,
+      dragMoved: false,
       dragLastTileId: null,
       dragLeftRack: false,
       audioCtx: null,
@@ -211,6 +218,7 @@
     const el = {
       board: document.getElementById('board'),
       rack: document.getElementById('rack'),
+      rackStage: document.getElementById('rackStage'),
       lineLayer: document.getElementById('lineLayer'),
       currentWord: document.getElementById('currentWord'),
       statusMsg: document.getElementById('statusMsg'),
@@ -256,6 +264,26 @@
     function remainingCountForLetter(letter) {
       const counts = recalcTileCounts();
       return counts.get(letter) || 0;
+    }
+
+    function fitsRemainingTiles(text) {
+      const counts = recalcTileCounts();
+      for (const letter of text) {
+        const available = counts.get(letter) || 0;
+        if (available <= 0) return false;
+        counts.set(letter, available - 1);
+      }
+      return true;
+    }
+
+    function canSelectText(text) {
+      return fitsRemainingTiles(text) || getLevel().words.some(item => !wordIsSolved(item) && item.word.startsWith(text));
+    }
+
+    function canSubmitBonus(text) {
+      return [...text].length >= 2 && getLevel().bonusWords.includes(text)
+        && !getLevel().words.some(item => item.word === text)
+        && !state.foundBonusWords.has(text) && fitsRemainingTiles(text);
     }
 
     function selectedCountForLetter(letter) {
@@ -310,7 +338,7 @@
         chip.textContent = item.word;
         el.targetWords.appendChild(chip);
       });
-      el.nextBtn.disabled = !allSolved();
+      el.nextBtn.disabled = !allSolved() || state.levelIdx >= LEVELS.length - 1;
     }
 
     function renderBonusWords() {
@@ -330,7 +358,13 @@
         const remaining = counts.get(letter) || 0;
         const selected = selectedCountForLetter(letter);
         const available = Math.max(0, remaining - selected);
-        tile.classList.toggle('disabled', available <= 0);
+        const nextWord = getCurrentWord() + letter;
+        const selectable = canSelectText(nextWord);
+        const reusable = selectable && !fitsRemainingTiles(nextWord);
+        tile.classList.toggle('disabled', !selectable);
+        tile.classList.toggle('reusable', reusable);
+        tile.setAttribute('aria-disabled', String(!selectable));
+        tile.title = reusable ? '채워진 글자를 정답에 다시 사용' : letter;
         tile.classList.toggle('active', state.selectedTiles.some(entry => entry.id === tile.dataset.id));
         tile.querySelector('.badge').textContent = String(available);
       });
@@ -339,6 +373,9 @@
 
     function renderRack() {
       const letters = [...new Set([...buildCellMap(getLevel()).values()])].sort((a, b) => a.localeCompare(b, 'ko'));
+      const columns = letters.length <= 4 ? Math.min(2, Math.max(1, letters.length)) : letters.length <= 9 ? 3 : 4;
+      el.rack.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+      el.rackStage.style.width = `${columns * 88 + (columns - 1) * 10}px`;
       el.rack.innerHTML = '';
       letters.forEach(letter => {
         const tile = document.createElement('div');
@@ -348,7 +385,11 @@
         tile.innerHTML = `<span>${letter}</span><span class="badge">0</span>`;
         tile.addEventListener('pointerdown', event => beginDrag(event, tile));
         tile.addEventListener('pointerenter', () => handleTileHover(tile));
-        tile.addEventListener('click', () => addTileSelection(tile));
+        tile.addEventListener('click', event => {
+          if (event.detail !== 0) return;
+          if (clearSelection._timer != null) clearSelection();
+          addTileSelection(tile);
+        });
         el.rack.appendChild(tile);
       });
       refreshRackVisuals();
@@ -368,6 +409,7 @@
         soundEnabled: state.soundEnabled,
         filledCoords: [...state.filledCoords].map(parseKey),
         foundBonusWords: [...state.foundBonusWords],
+        rewardClaimed: state.rewardClaimed,
         updatedAt: Date.now(),
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -377,6 +419,7 @@
     }
 
     function loadState() {
+      clearSelection();
       try {
         const raw = localStorage.getItem(SAVE_KEY);
         if (!raw) return;
@@ -386,15 +429,18 @@
         state.soundEnabled = payload.soundEnabled ?? true;
         state.filledCoords = new Set((payload.filledCoords || []).map(([r, c]) => coordKey(r, c)));
         state.foundBonusWords = new Set(payload.foundBonusWords || []);
+        state.rewardClaimed = typeof payload.rewardClaimed === 'boolean' ? payload.rewardClaimed : allSolved();
       } catch (error) {
         console.warn('save load failed', error);
       }
     }
 
     function resetLevelState(keepCoins = true) {
+      clearSelection();
       state.filledCoords = new Set();
       state.foundBonusWords = new Set();
       state.selectedTiles = [];
+      state.rewardClaimed = false;
       if (!keepCoins) state.coins = 100;
       saveState();
     }
@@ -418,9 +464,8 @@
     function addTileSelection(tile) {
       const letter = tile.dataset.letter;
       if (!letter) return;
-      const remaining = remainingCountForLetter(letter);
-      const selected = selectedCountForLetter(letter);
-      if (selected >= remaining) return;
+      if (!canSelectText(getCurrentWord() + letter)) return;
+      clearTimeout(clearSelection._timer);
       tile.classList.add('active');
       state.selectedTiles.push({ letter, id: tile.dataset.id, tile });
       state.dragLastTileId = tile.dataset.id;
@@ -432,8 +477,11 @@
     }
 
     function beginDrag(event, tile) {
+      if (event.isPrimary === false || (event.button !== undefined && event.button !== 0)) return;
       event.preventDefault();
+      if (clearSelection._timer != null) clearSelection();
       state.dragActive = true;
+      state.dragMoved = false;
       addTileSelection(tile);
       tile.setPointerCapture?.(event.pointerId);
     }
@@ -443,10 +491,14 @@
       const id = tile.dataset.id;
       const lastId = state.dragLastTileId;
       if (!lastId || id !== lastId) {
+        state.dragMoved = true;
         addTileSelection(tile);
         return;
       }
-      if (state.dragLeftRack) addTileSelection(tile);
+      if (state.dragLeftRack) {
+        state.dragMoved = true;
+        addTileSelection(tile);
+      }
     }
 
     function onPointerMove(event) {
@@ -464,11 +516,15 @@
     function onPointerUp() {
       if (!state.dragActive) return;
       state.dragActive = false;
-      submitCurrentWord();
+      if (state.dragMoved) submitCurrentWord();
       drawSelectionLines();
     }
 
     function clearSelection() {
+      clearTimeout(clearSelection._timer);
+      clearSelection._timer = null;
+      state.dragActive = false;
+      state.dragMoved = false;
       state.selectedTiles = [];
       state.dragLastTileId = null;
       state.dragLeftRack = false;
@@ -512,9 +568,9 @@
     function playCoin() { [880, 1175].forEach((freq, i) => setTimeout(() => playTone(freq, 0.06, 'square', 0.03), i * 50)); }
 
     function animateWordFill(item) {
-      const coords = wordCoords(item).filter(([r, c]) => !state.filledCoords.has(coordKey(r, c)));
       const letters = [...item.word];
-      coords.forEach(([r, c], index) => {
+      wordCoords(item).forEach(([r, c], index) => {
+        if (state.filledCoords.has(coordKey(r, c))) return;
         const cell = el.board.querySelector(`.cell[data-key="${coordKey(r, c)}"]`);
         const source = state.selectedTiles[index]?.tile || state.selectedTiles[0]?.tile || el.rack.querySelector(`.tile[data-letter="${letters[index] || letters[0]}"]`);
         if (!cell || !source) return;
@@ -539,24 +595,34 @@
       });
     }
 
+    function checkLevelClear() {
+      if (!allSolved()) return false;
+      const awarded = !state.rewardClaimed;
+      if (awarded) {
+        state.coins += 30;
+        state.rewardClaimed = true;
+      }
+      const message = state.levelIdx >= LEVELS.length - 1
+        ? '모든 레벨을 완료했습니다! 축하합니다!'
+        : '스테이지 클리어!';
+      setStatus(`${message}${awarded ? ' +30🪙' : ''}`);
+      return awarded;
+    }
+
     function markWordSolved(item) {
+      if (wordIsSolved(item)) return;
       animateWordFill(item);
       wordCoords(item).forEach(([r, c]) => state.filledCoords.add(coordKey(r, c)));
       state.coins += Math.max(10, item.word.length * 5);
       playSuccess();
       setStatus(`정답! ${item.word}`);
+      checkLevelClear();
       saveState();
       renderAll();
-      if (allSolved()) {
-        state.coins += 30;
-        setStatus('스테이지 클리어! +30🪙');
-        saveState();
-        renderHeader();
-        el.nextBtn.disabled = state.levelIdx >= LEVELS.length - 1;
-      }
     }
 
     function awardBonus(word) {
+      if (!canSubmitBonus(word)) return;
       state.foundBonusWords.add(word);
       state.coins += 15;
       playCoin();
@@ -572,7 +638,7 @@
         return;
       }
       const boardWord = matchingBoardWord(word);
-      const isBonus = getLevel().bonusWords.includes(word) && !state.foundBonusWords.has(word);
+      const isBonus = canSubmitBonus(word);
       if (boardWord) {
         updateCurrentWord('success');
         markWordSolved(boardWord);
@@ -584,7 +650,8 @@
         playError();
         setStatus('아직 보드 정답이나 보너스 단어가 아닙니다.');
       }
-      setTimeout(() => clearSelection(), 220);
+      clearTimeout(clearSelection._timer);
+      clearSelection._timer = setTimeout(clearSelection, 220);
     }
 
     function giveHint() {
@@ -595,11 +662,13 @@
       }
       const allCoords = [...buildCellMap(getLevel()).keys()].filter(key => !state.filledCoords.has(key));
       if (!allCoords.length) return;
+      clearSelection();
       const randomKey = allCoords[Math.floor(Math.random() * allCoords.length)];
       state.coins -= 30;
       state.filledCoords.add(randomKey);
       setStatus('힌트로 한 칸을 열었습니다.');
       playSuccess();
+      checkLevelClear();
       saveState();
       renderAll();
     }
@@ -629,6 +698,7 @@
     }
 
     function renderAll() {
+      clearSelection();
       renderHeader();
       renderBoard();
       renderTargetWords();
@@ -638,11 +708,13 @@
     }
 
     function nextLevel() {
-      if (state.levelIdx >= LEVELS.length - 1) return;
+      if (!allSolved() || state.levelIdx >= LEVELS.length - 1) return;
+      clearSelection();
       state.levelIdx += 1;
       state.filledCoords = new Set();
       state.foundBonusWords = new Set();
       state.selectedTiles = [];
+      state.rewardClaimed = false;
       setStatus('다음 레벨로 이동했습니다.');
       saveState();
       renderAll();
@@ -652,6 +724,13 @@
       el.clearBtn.addEventListener('click', () => { clearSelection(); setStatus('입력을 지웠습니다.'); });
       el.hintBtn.addEventListener('click', giveHint);
       el.nextBtn.addEventListener('click', nextLevel);
+      el.currentWord.addEventListener('click', submitCurrentWord);
+      el.currentWord.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          submitCurrentWord();
+        }
+      });
       el.soundBtn.addEventListener('click', () => { state.soundEnabled = !state.soundEnabled; saveState(); renderHeader(); });
       el.bonusBtn.addEventListener('click', () => {
         const list = getLevel().bonusWords.join(', ');
@@ -659,12 +738,13 @@
       });
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointercancel', clearSelection);
       window.addEventListener('resize', renderAll);
     }
 
     function boot() {
       loadState();
+      if (checkLevelClear()) saveState();
       attachEvents();
       renderAll();
     }

@@ -34,6 +34,8 @@ func set_filled_with_pop(ch: String) -> void:
 	tween.tween_property(self, "scale", Vector2.ONE, 0.12)
 
 func _apply_visual_state() -> void:
+	if not is_instance_valid(char_label):
+		return
 	if target_char == "":
 		style_box.bg_color = Color(0, 0, 0, 0)
 		char_label.text = ""
